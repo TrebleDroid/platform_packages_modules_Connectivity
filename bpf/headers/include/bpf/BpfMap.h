@@ -60,21 +60,24 @@ class BpfMapRO {
 
   protected:
     void abortOnMismatch(bool writable) const {
-        if (!mMapFd.ok()) abort();
-        if (isAtLeastKernelVersion(4, 14, 0)) {
-            int flags = bpfGetFdMapFlags(mMapFd);
-            if (flags < 0) abort();
-            if (flags & BPF_F_WRONLY) abort();
-            if (writable && (flags & BPF_F_RDONLY)) abort();
-            if (bpfGetFdKeySize(mMapFd) != sizeof(Key)) abort();
-            if (bpfGetFdValueSize(mMapFd) != sizeof(Value)) abort();
-        }
+        (void) writable;
     }
 
   public:
+    bool isOk(bool writable = false) const {
+        if (!mMapFd.ok()) return false;
+        if (isAtLeastKernelVersion(4, 14, 0)) {
+            int flags = bpfGetFdMapFlags(mMapFd);
+            if (flags < 0) return false;
+            if (flags & BPF_F_WRONLY) return false;
+            if (writable && (flags & BPF_F_RDONLY)) return false;
+            if (bpfGetFdKeySize(mMapFd) != sizeof(Key)) return false;
+            if (bpfGetFdValueSize(mMapFd) != sizeof(Value)) return false;
+        }
+        return true;
+    }
     explicit BpfMapRO<Key, Value>(const char* pathname) {
         mMapFd.reset(mapRetrieveRO(pathname));
-        abortOnMismatch(/* writable */ false);
     }
 
     Result<Key> getFirstKey() const {

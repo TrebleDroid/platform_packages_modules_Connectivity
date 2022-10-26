@@ -1410,6 +1410,7 @@ static int doLoad(char** argv, char * const envp[]) {
     const bool isAtLeastU = (effective_api_level >= __ANDROID_API_U__);
     const bool isAtLeastV = (effective_api_level >= __ANDROID_API_V__);
     const bool isAtLeastW = (effective_api_level >  __ANDROID_API_V__);  // TODO: switch to W
+    bool failed = false;
 
     const int first_api_level = GetIntProperty("ro.board.first_api_level", effective_api_level);
 
@@ -1445,26 +1446,26 @@ static int doLoad(char** argv, char * const envp[]) {
 
     if (!isAtLeastT) {
         ALOGE("Impossible - not reachable on Android <T.");
-        return 1;
+        failed = true;
     }
 
     // both S and T require kernel 4.9 (and eBpf support)
     if (isAtLeastT && !isAtLeastKernelVersion(4, 9, 0)) {
         ALOGE("Android T requires kernel 4.9.");
-        return 1;
+        failed = true;
     }
 
     // U bumps the kernel requirement up to 4.14
     if (isAtLeastU && !isAtLeastKernelVersion(4, 14, 0)) {
         ALOGE("Android U requires kernel 4.14.");
-        return 1;
+        failed = true;
     }
 
     // V bumps the kernel requirement up to 4.19
     // see also: //system/netd/tests/kernel_test.cpp TestKernel419
     if (isAtLeastV && !isAtLeastKernelVersion(4, 19, 0)) {
         ALOGE("Android V requires kernel 4.19.");
-        return 1;
+        failed = true;
     }
 
     // Technically already required by U, but only enforce on V+
@@ -1483,7 +1484,7 @@ static int doLoad(char** argv, char * const envp[]) {
     // Various known ABI layout issues, particularly wrt. bpf and ipsec/xfrm.
     if (isAtLeastV && isKernel32Bit() && isX86()) {
         ALOGE("Android V requires X86 kernel to be 64-bit.");
-        if (!isTV()) return 1;
+        if (!isTV()) failed = true;
     }
 
     if (isAtLeastV) {
@@ -1568,7 +1569,7 @@ static int doLoad(char** argv, char * const envp[]) {
     if (!isEng() && !isUser() && !isUserdebug()) {
         ALOGE("Failed to determine the build type: got %s, want 'eng', 'user', or 'userdebug'",
               getBuildType().c_str());
-        return 1;
+        failed = true;
     }
 
     if (runningAsRoot) {
@@ -1620,23 +1621,16 @@ static int doLoad(char** argv, char * const envp[]) {
     // Load all ELF objects, create programs and maps, and pin them
     for (const auto& location : locations) {
         if (loadAllElfObjects(bpfloader_ver, location) != 0) {
-            ALOGE("=== CRITICAL FAILURE LOADING BPF PROGRAMS FROM %s ===", location.dir);
-            ALOGE("If this triggers reliably, you're probably missing kernel options or patches.");
-            ALOGE("If this triggers randomly, you might be hitting some memory allocation "
-                  "problems or startup script race.");
-            ALOGE("--- DO NOT EXPECT SYSTEM TO BOOT SUCCESSFULLY ---");
-            sleep(20);
-            return 2;
+            failed = true;
         }
     }
 
-    int key = 1;
-    int value = 123;
-    unique_fd map(
-            createMap(BPF_MAP_TYPE_ARRAY, sizeof(key), sizeof(value), 2, 0));
-    if (writeToMapEntry(map, &key, &value, BPF_ANY)) {
-        ALOGE("Critical kernel bug - failure to write into index 1 of 2 element bpf map array.");
-        return 1;
+    if (failed) {
+        ALOGE("=== CRITICAL FAILURE LOADING BPF PROGRAMS ===");
+        ALOGE("If this triggers reliably, you're probably missing kernel options or patches.");
+        ALOGE("If this triggers randomly, you might be hitting some memory allocation "
+              "problems or startup script race.");
+        ALOGE("--- DO NOT EXPECT SYSTEM TO BOOT SUCCESSFULLY ---");
     }
 
     // leave a flag that we're done
