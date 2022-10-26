@@ -213,6 +213,8 @@ public class BpfNetMapsUtils {
             final IBpfMap<S32, U32> configurationMap, final int chain) {
         throwIfPreT("isChainEnabled is not available on pre-T devices");
 
+        if (configurationMap == null) return false;
+
         final long match = getMatchByFirewallChain(chain);
         try {
             final U32 config = configurationMap.getValue(UID_RULES_CONFIGURATION_KEY);
@@ -237,6 +239,8 @@ public class BpfNetMapsUtils {
     public static int getUidRule(final IBpfMap<S32, UidOwnerValue> uidOwnerMap,
             final int chain, final int uid) {
         throwIfPreT("getUidRule is not available on pre-T devices");
+
+        if (uidOwnerMap == null) return FIREWALL_RULE_ALLOW;
 
         final long match = getMatchByFirewallChain(chain);
         final boolean isAllowList = isFirewallAllowList(chain);
@@ -331,6 +335,8 @@ public class BpfNetMapsUtils {
     ) {
         throwIfPreT("isUidBlockedByFirewallChains is not available on pre-T devices");
 
+        if (configurationMap == null) return false;
+
         // System uids are not blocked by firewall chains, see bpf_progs/netd.c
         // TODO: b/348513058 - use UserHandle.isCore() once it is accessible
         if (UserHandle.getAppId(uid) < Process.FIRST_APPLICATION_UID) {
@@ -365,6 +371,7 @@ public class BpfNetMapsUtils {
     public static boolean getDataSaverEnabled(IBpfMap<S32, U8> dataSaverEnabledMap) {
         throwIfPreT("getDataSaverEnabled is not available on pre-T devices");
 
+        if (dataSaverEnabledMap == null) return false;
         try {
             return dataSaverEnabledMap.getValue(DATA_SAVER_ENABLED_KEY).val == DATA_SAVER_ENABLED;
         } catch (ErrnoException e) {

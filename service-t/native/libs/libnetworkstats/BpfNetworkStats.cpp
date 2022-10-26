@@ -195,6 +195,7 @@ int parseBpfNetworkStatsDetail(std::vector<stats_line>* lines) {
     static BpfMapRO<uint32_t, uint32_t> configurationMap(CONFIGURATION_MAP_PATH);
     static BpfMap<StatsKey, StatsValue> statsMapA(STATS_MAP_A_PATH);
     static BpfMap<StatsKey, StatsValue> statsMapB(STATS_MAP_B_PATH);
+    if (!configurationMap.isOk()) return -1;
     auto configuration = configurationMap.readValue(CURRENT_STATS_MAP_CONFIGURATION_KEY);
     if (!configuration.ok()) {
         ALOGE("Cannot read the old configuration from map: %s",
