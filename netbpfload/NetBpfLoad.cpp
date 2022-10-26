@@ -175,10 +175,11 @@ int main(int argc, char** argv, char * const envp[]) {
 
     const int device_api_level = android_get_device_api_level();
     const bool isAtLeastU = (device_api_level >= __ANDROID_API_U__);
+    bool failed = false;
 
     if (!android::bpf::isAtLeastKernelVersion(4, 19, 0)) {
         ALOGE("Android U QPR2 requires kernel 4.19.");
-        return 1;
+        failed = true;
     }
 
     if (android::bpf::isUserspace32bit() && android::bpf::isAtLeastKernelVersion(6, 2, 0)) {
@@ -202,14 +203,14 @@ int main(int argc, char** argv, char * const envp[]) {
          * and 32-bit userspace on 64-bit kernel bpf ringbuffer compatibility is broken.
          */
         ALOGE("64-bit userspace required on 6.2+ kernels.");
-        return 1;
+        failed = true;
     }
 
     // Ensure we can determine the Android build type.
     if (!android::bpf::isEng() && !android::bpf::isUser() && !android::bpf::isUserdebug()) {
         ALOGE("Failed to determine the build type: got %s, want 'eng', 'user', or 'userdebug'",
               android::bpf::getBuildType().c_str());
-        return 1;
+        failed = true;
     }
 
     if (isAtLeastU) {
@@ -239,30 +240,24 @@ int main(int argc, char** argv, char * const envp[]) {
     //  which could otherwise fail with ENOENT during object pinning or renaming,
     //  due to ordering issues)
     for (const auto& location : locations) {
-        if (createSysFsBpfSubDir(location.prefix)) return 1;
+        if (createSysFsBpfSubDir(location.prefix)) failed = true;
     }
 
     // Load all ELF objects, create programs and maps, and pin them
     for (const auto& location : locations) {
         if (loadAllElfObjects(location) != 0) {
-            ALOGE("=== CRITICAL FAILURE LOADING BPF PROGRAMS FROM %s ===", location.dir);
-            ALOGE("If this triggers reliably, you're probably missing kernel options or patches.");
-            ALOGE("If this triggers randomly, you might be hitting some memory allocation "
-                  "problems or startup script race.");
-            ALOGE("--- DO NOT EXPECT SYSTEM TO BOOT SUCCESSFULLY ---");
-            sleep(20);
-            return 2;
+            failed = true;
         }
     }
 
-    int key = 1;
-    int value = 123;
-    android::base::unique_fd map(
-            android::bpf::createMap(BPF_MAP_TYPE_ARRAY, sizeof(key), sizeof(value), 2, 0));
-    if (android::bpf::writeToMapEntry(map, &key, &value, BPF_ANY)) {
-        ALOGE("Critical kernel bug - failure to write into index 1 of 2 element bpf map array.");
-        return 1;
+    if (failed) {
+        ALOGE("=== CRITICAL FAILURE LOADING BPF PROGRAMS ===");
+        ALOGE("If this triggers reliably, you're probably missing kernel options or patches.");
+        ALOGE("If this triggers randomly, you might be hitting some memory allocation "
+                "problems or startup script race.");
+        ALOGE("--- DO NOT EXPECT SYSTEM TO BOOT SUCCESSFULLY ---");
     }
+
 
     ALOGI("done, transferring control to platform bpfloader.");
 

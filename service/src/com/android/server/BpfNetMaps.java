@@ -358,7 +358,11 @@ public class BpfNetMaps {
     @VisibleForTesting
     public BpfNetMaps(final Context context, final INetd netd, final Dependencies deps) {
         if (!PRE_T) {
-            ensureInitialized(context);
+            try {
+                ensureInitialized(context);
+            } catch(Throwable t) {
+                android.util.Log.e("PHH", "Failed initialization BpfMaps, doing without it", t);
+            }
         }
         mNetd = netd;
         mDeps = deps;
@@ -794,6 +798,8 @@ public class BpfNetMaps {
     public void swapActiveStatsMap() {
         throwIfPreT("swapActiveStatsMap is not available on pre-T devices");
 
+        if (sConfigurationMap == null) return;
+
         try {
             synchronized (sCurrentStatsMapConfigLock) {
                 final long config = sConfigurationMap.getValue(
@@ -833,6 +839,8 @@ public class BpfNetMaps {
             mNetd.trafficSetNetPermForUids(permissions, uids);
             return;
         }
+
+        if (sUidPermissionMap == null) return;
 
         // Remove the entry if package is uninstalled or uid has only INTERNET permission.
         if (permissions == PERMISSION_UNINSTALLED || permissions == PERMISSION_INTERNET) {
@@ -932,7 +940,9 @@ public class BpfNetMaps {
         // deletion. netd and skDestroyListener could delete CookieTagMap entry concurrently.
         // So using Set to count the number of entry in the map.
         Set<K> keySet = new ArraySet<>();
-        map.forEach((k, v) -> keySet.add(k));
+        if (map != null) {
+            map.forEach((k, v) -> keySet.add(k));
+        }
         return keySet.size();
     }
 
