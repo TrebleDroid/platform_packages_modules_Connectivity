@@ -102,13 +102,13 @@ int bpfGetIfaceStatsInternal(const char* iface, Stats* stats,
 int bpfGetIfaceStats(const char* iface, Stats* stats) {
     BpfMapRO<uint32_t, StatsValue> ifaceStatsMap(IFACE_STATS_MAP_PATH);
     int ret;
-    if (!ifaceStatsMap.isValid()) {
+    if (!ifaceStatsMap.isValid() || !ifaceStatsMap.isOk()) {
         ret = -errno;
         ALOGE("get ifaceStats map fd failed: %s", strerror(errno));
         return ret;
     }
     BpfMapRO<uint32_t, IfaceValue> ifaceIndexNameMap(IFACE_INDEX_NAME_MAP_PATH);
-    if (!ifaceIndexNameMap.isValid()) {
+    if (!ifaceIndexNameMap.isValid() || !ifaceStatsMap.isOk()) {
         ret = -errno;
         ALOGE("get ifaceIndexName map fd failed: %s", strerror(errno));
         return ret;
