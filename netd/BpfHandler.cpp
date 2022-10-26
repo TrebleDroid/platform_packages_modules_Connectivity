@@ -71,8 +71,15 @@ static Status initPrograms(const char* cg2_path) {
         ALOGE("Failed to open the cgroup directory: %s", strerror(ret));
         return statusFromErrno(ret, "Open the cgroup directory failed");
     }
-    RETURN_IF_NOT_OK(attachProgramToCgroup(BPF_EGRESS_PROG_PATH, cg_fd, BPF_CGROUP_INET_EGRESS));
-    RETURN_IF_NOT_OK(attachProgramToCgroup(BPF_INGRESS_PROG_PATH, cg_fd, BPF_CGROUP_INET_INGRESS));
+    auto ret = attachProgramToCgroup(BPF_EGRESS_PROG_PATH, cg_fd, BPF_CGROUP_INET_EGRESS);
+    if (!isOk(ret)) {
+        ALOGE("Failed loading egress program");
+    }
+
+    auto ret2 = attachProgramToCgroup(BPF_INGRESS_PROG_PATH, cg_fd, BPF_CGROUP_INET_INGRESS);
+    if (!isOk(ret)) {
+        ALOGE("Failed loading ingress program");
+    }
 
     // For the devices that support cgroup socket filter, the socket filter
     // should be loaded successfully by bpfloader. So we attach the filter to
