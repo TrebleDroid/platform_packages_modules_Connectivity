@@ -2450,6 +2450,7 @@ public class NetworkStatsService extends INetworkStatsService.Stub {
      * @param uid
      */
     private void deleteKernelTagData(int uid) {
+        if(mCookieTagMap == null) return;
         try {
             mCookieTagMap.forEach((key, value) -> {
                 // If SkDestroyListener deletes the socket tag while this code is running,
