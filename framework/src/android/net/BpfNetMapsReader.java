@@ -124,7 +124,7 @@ public class BpfNetMapsReader {
                 return new BpfMap<>(CONFIGURATION_MAP_PATH, BpfMap.BPF_F_RDONLY,
                         S32.class, U32.class);
             } catch (ErrnoException e) {
-                throw new IllegalStateException("Cannot open configuration map", e);
+                return null;
             }
         }
 
@@ -134,7 +134,7 @@ public class BpfNetMapsReader {
                 return new BpfMap<>(UID_OWNER_MAP_PATH, BpfMap.BPF_F_RDONLY,
                         S32.class, UidOwnerValue.class);
             } catch (ErrnoException e) {
-                throw new IllegalStateException("Cannot open uid owner map", e);
+                return null;
             }
         }
 
@@ -144,7 +144,7 @@ public class BpfNetMapsReader {
                 return new BpfMap<>(DATA_SAVER_ENABLED_MAP_PATH, BpfMap.BPF_F_RDONLY, S32.class,
                         U8.class);
             } catch (ErrnoException e) {
-                throw new IllegalStateException("Cannot open data saver enabled map", e);
+                return null;
             }
         }
     }
@@ -191,6 +191,8 @@ public class BpfNetMapsReader {
             final IBpfMap<S32, U32> configurationMap, final int chain) {
         throwIfPreT("isChainEnabled is not available on pre-T devices");
 
+        if (configurationMap == null) return false;
+
         final long match = getMatchByFirewallChain(chain);
         try {
             final U32 config = configurationMap.getValue(UID_RULES_CONFIGURATION_KEY);
@@ -215,6 +217,8 @@ public class BpfNetMapsReader {
     public static int getUidRule(final IBpfMap<S32, UidOwnerValue> uidOwnerMap,
             final int chain, final int uid) {
         throwIfPreT("getUidRule is not available on pre-T devices");
+
+        if (uidOwnerMap == null) return FIREWALL_RULE_ALLOW;
 
         final long match = getMatchByFirewallChain(chain);
         final boolean isAllowList = isFirewallAllowList(chain);
@@ -243,6 +247,8 @@ public class BpfNetMapsReader {
     public boolean isUidNetworkingBlocked(final int uid, boolean isNetworkMetered,
             boolean isDataSaverEnabled) {
         throwIfPreT("isUidBlockedByFirewallChains is not available on pre-T devices");
+
+        if (mConfigurationMap == null) return false;
 
         final long uidRuleConfig;
         final long uidMatch;
@@ -277,6 +283,7 @@ public class BpfNetMapsReader {
     public boolean getDataSaverEnabled() {
         throwIfPreT("getDataSaverEnabled is not available on pre-T devices");
 
+        if (mDataSaverEnabledMap == null) return false;
         try {
             return mDataSaverEnabledMap.getValue(DATA_SAVER_ENABLED_KEY).val == DATA_SAVER_ENABLED;
         } catch (ErrnoException e) {

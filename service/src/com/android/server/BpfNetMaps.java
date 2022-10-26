@@ -366,7 +366,11 @@ public class BpfNetMaps {
     @VisibleForTesting
     public BpfNetMaps(final Context context, final INetd netd, final Dependencies deps) {
         if (SdkLevel.isAtLeastT()) {
-            ensureInitialized(context);
+            try {
+                ensureInitialized(context);
+            } catch(Throwable t) {
+                android.util.Log.e("PHH", "Failed initialization BpfMaps, doing without it", t);
+            }
         }
         mNetd = netd;
         mDeps = deps;
@@ -385,6 +389,8 @@ public class BpfNetMaps {
     }
 
     private void removeRule(final int uid, final long match, final String caller) {
+        if (sUidOwnerMap == null) return;
+
         try {
             synchronized (sUidOwnerMap) {
                 final UidOwnerValue oldMatch = sUidOwnerMap.getValue(new S32(uid));
@@ -412,6 +418,8 @@ public class BpfNetMaps {
     }
 
     private void addRule(final int uid, final long match, final int iif, final String caller) {
+        if (sUidOwnerMap == null) return;
+
         if (match != IIF_MATCH && iif != 0) {
             throw new ServiceSpecificException(EINVAL,
                     "Non-interface match must have zero interface index");
@@ -514,6 +522,8 @@ public class BpfNetMaps {
     public void setChildChain(final int childChain, final boolean enable) {
         throwIfPreT("setChildChain is not available on pre-T devices");
 
+        if (sConfigurationMap == null) return;
+
         final long match = getMatchByFirewallChain(childChain);
         try {
             synchronized (sUidRulesConfigBpfMapLock) {
@@ -565,6 +575,8 @@ public class BpfNetMaps {
     @RequiresApi(Build.VERSION_CODES.TIRAMISU)
     public void replaceUidChain(final int chain, final int[] uids) {
         throwIfPreT("replaceUidChain is not available on pre-T devices");
+
+        if (sUidOwnerMap == null) return;
 
         final long match;
         try {
@@ -646,6 +658,9 @@ public class BpfNetMaps {
     private Set<Integer> getUidsMatchEnabled(final int childChain) throws ErrnoException {
         final long match = getMatchByFirewallChain(childChain);
         Set<Integer> uids = new ArraySet<>();
+
+        if (sUidOwnerMap == null) return uids;
+
         synchronized (sUidOwnerMap) {
             sUidOwnerMap.forEach((uid, val) -> {
                 if (val == null) {
@@ -802,6 +817,8 @@ public class BpfNetMaps {
     public void swapActiveStatsMap() {
         throwIfPreT("swapActiveStatsMap is not available on pre-T devices");
 
+        if (sConfigurationMap == null) return;
+
         try {
             synchronized (sCurrentStatsMapConfigLock) {
                 final long config = sConfigurationMap.getValue(
@@ -842,6 +859,8 @@ public class BpfNetMaps {
             return;
         }
 
+        if (sUidPermissionMap == null) return;
+
         // Remove the entry if package is uninstalled or uid has only INTERNET permission.
         if (permissions == PERMISSION_UNINSTALLED || permissions == PERMISSION_INTERNET) {
             for (final int uid : uids) {
@@ -876,6 +895,8 @@ public class BpfNetMaps {
     public void setDataSaverEnabled(boolean enable) {
         throwIfPreT("setDataSaverEnabled is not available on pre-T devices");
 
+        if (sDataSaverEnabledMap == null) return;
+
         try {
             final short config = enable ? DATA_SAVER_ENABLED : DATA_SAVER_DISABLED;
             sDataSaverEnabledMap.updateEntry(DATA_SAVER_ENABLED_KEY, new U8(config));
@@ -894,6 +915,9 @@ public class BpfNetMaps {
     @RequiresApi(Build.VERSION_CODES.TIRAMISU)
     public void setIngressDiscardRule(final InetAddress address, final String iface) {
         throwIfPreT("setIngressDiscardRule is not available on pre-T devices");
+
+        if (sIngressDiscardMap == null) return;
+
         final int ifIndex = mDeps.getIfIndex(iface);
         if (ifIndex == 0) {
             Log.e(TAG, "Failed to get if index, skip setting ingress discard rule for " + address
@@ -917,6 +941,9 @@ public class BpfNetMaps {
     @RequiresApi(Build.VERSION_CODES.TIRAMISU)
     public void removeIngressDiscardRule(final InetAddress address) {
         throwIfPreT("removeIngressDiscardRule is not available on pre-T devices");
+
+        if (sIngressDiscardMap == null) return;
+
         try {
             sIngressDiscardMap.deleteEntry(new IngressDiscardKey(address));
         } catch (ErrnoException e) {
@@ -940,7 +967,9 @@ public class BpfNetMaps {
         // deletion. netd and skDestroyListener could delete CookieTagMap entry concurrently.
         // So using Set to count the number of entry in the map.
         Set<K> keySet = new ArraySet<>();
-        map.forEach((k, v) -> keySet.add(k));
+        if (map != null) {
+            map.forEach((k, v) -> keySet.add(k));
+        }
         return keySet.size();
     }
 
@@ -987,6 +1016,8 @@ public class BpfNetMaps {
     }
 
     private void dumpOwnerMatchConfig(final IndentingPrintWriter pw) {
+        if (sConfigurationMap == null) return;
+
         try {
             final long match = sConfigurationMap.getValue(UID_RULES_CONFIGURATION_KEY).val;
             pw.println("current ownerMatch configuration: " + match + " " + matchToString(match));
@@ -996,6 +1027,8 @@ public class BpfNetMaps {
     }
 
     private void dumpCurrentStatsMapConfig(final IndentingPrintWriter pw) {
+        if (sConfigurationMap == null) return;
+
         try {
             final long config = sConfigurationMap.getValue(CURRENT_STATS_MAP_CONFIGURATION_KEY).val;
             final String currentStatsMap =
@@ -1007,6 +1040,8 @@ public class BpfNetMaps {
     }
 
     private void dumpDataSaverConfig(final IndentingPrintWriter pw) {
+        if (sDataSaverEnabledMap == null) return;
+
         try {
             final short config = sDataSaverEnabledMap.getValue(DATA_SAVER_ENABLED_KEY).val;
             // Any non-zero value converted from short to boolean is true by convention.
