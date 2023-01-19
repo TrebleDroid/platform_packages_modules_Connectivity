@@ -40,6 +40,9 @@ using android::bpf::NetworkTraceHandler;
 
 namespace android {
 
+static const char* QTAGUID_IFACE_STATS = "/proc/net/xt_qtaguid/iface_stat_fmt";
+static const char* QTAGUID_UID_STATS = "/proc/net/xt_qtaguid/stats";
+
 static struct {
     jclass theClass;
     jmethodID constructor;
@@ -69,10 +72,80 @@ static jobject statsValueToEntry(JNIEnv* env, StatsValue* stats) {
     return result;
 }
 
+static int parseIfaceStats(const char* iface, StatsValue* stats) {
+    FILE *fp = fopen(QTAGUID_IFACE_STATS, "r");
+    if (fp == NULL) {
+        return -1;
+    }
+
+    char buffer[384];
+    char cur_iface[32];
+    uint64_t rxBytes, rxPackets, txBytes, txPackets, tcpRxPackets, tcpTxPackets;
+
+    while (fgets(buffer, sizeof(buffer), fp) != NULL) {
+        int matched = sscanf(buffer, "%31s %" SCNu64 " %" SCNu64 " %" SCNu64
+                " %" SCNu64 " " "%*u %" SCNu64 " %*u %*u %*u %*u "
+                "%*u %" SCNu64 " %*u %*u %*u %*u", cur_iface, &rxBytes,
+                &rxPackets, &txBytes, &txPackets, &tcpRxPackets, &tcpTxPackets);
+        if (matched >= 5) {
+            if (!iface || !strcmp(iface, cur_iface)) {
+                stats->rxBytes += rxBytes;
+                stats->rxPackets += rxPackets;
+                stats->txBytes += txBytes;
+                stats->txPackets += txPackets;
+            }
+        }
+    }
+
+    if (fclose(fp) != 0) {
+        return -1;
+    }
+    return 0;
+}
+
+static int parseUidStats(const uint32_t uid, StatsValue* stats) {
+    FILE *fp = fopen(QTAGUID_UID_STATS, "r");
+    if (fp == NULL) {
+        return -1;
+    }
+
+    char buffer[384];
+    char iface[32];
+    uint32_t idx, cur_uid, set;
+    uint64_t tag, rxBytes, rxPackets, txBytes, txPackets;
+
+    while (fgets(buffer, sizeof(buffer), fp) != NULL) {
+        if (sscanf(buffer,
+                "%" SCNu32 " %31s 0x%" SCNx64 " %u %u %" SCNu64 " %" SCNu64
+                " %" SCNu64 " %" SCNu64 "",
+                &idx, iface, &tag, &cur_uid, &set, &rxBytes, &rxPackets,
+                &txBytes, &txPackets) == 9) {
+            if (uid == cur_uid && tag == 0L) {
+                stats->rxBytes += rxBytes;
+                stats->rxPackets += rxPackets;
+                stats->txBytes += txBytes;
+                stats->txPackets += txPackets;
+            }
+        }
+    }
+
+    if (fclose(fp) != 0) {
+        return -1;
+    }
+    return 0;
+}
+
 static jobject nativeGetTotalStat(JNIEnv* env, jclass clazz) {
     StatsValue stats = {};
-    if (bpfGetIfaceStats(nullptr, &stats)) return nullptr;
-    return statsValueToEntry(env, &stats);
+    if (bpfGetIfaceStats(nullptr, &stats) == 0) {
+        return statsValueToEntry(env, &stats);
+    } else {
+        if (parseIfaceStats(nullptr, &stats) == 0) {
+            return statsValueToEntry(env, &stats);
+        } else {
+            return nullptr;
+        }
+    }
 }
 
 static jobject nativeGetIfaceStat(JNIEnv* env, jclass clazz, jstring iface) {
@@ -80,14 +153,28 @@ static jobject nativeGetIfaceStat(JNIEnv* env, jclass clazz, jstring iface) {
     if (!iface8.c_str()) return nullptr;
 
     StatsValue stats = {};
-    if (bpfGetIfaceStats(iface8.c_str(), &stats)) return nullptr;
-    return statsValueToEntry(env, &stats);
+    if (bpfGetIfaceStats(iface8.c_str(), &stats) == 0) {
+        return statsValueToEntry(env, &stats);
+    } else {
+        if (parseIfaceStats(iface8.c_str(), &stats) == 0) {
+            return statsValueToEntry(env, &stats);
+        } else {
+            return nullptr;
+        }
+    }
 }
 
 static jobject nativeGetUidStat(JNIEnv* env, jclass clazz, jint uid) {
     StatsValue stats = {};
-    if (bpfGetUidStats(uid, &stats)) return nullptr;
-    return statsValueToEntry(env, &stats);
+    if (bpfGetUidStats(uid, &stats) == 0) {
+        return statsValueToEntry(env, &stats);
+    } else {
+        if (parseUidStats(uid, &stats) == 0) {
+            return statsValueToEntry(env, &stats);
+        } else {
+            return nullptr;
+        }
+    }
 }
 
 static void nativeInitNetworkTracing(JNIEnv* env, jclass clazz) {
