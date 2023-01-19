@@ -78,7 +78,7 @@ import java.util.StringJoiner;
  * {@hide}
  */
 public class BpfNetMaps {
-    private static final boolean PRE_T = !SdkLevel.isAtLeastT();
+    private static boolean PRE_T = !SdkLevel.isAtLeastT();
     static {
         if (!PRE_T) {
             System.loadLibrary("service-connectivity");
