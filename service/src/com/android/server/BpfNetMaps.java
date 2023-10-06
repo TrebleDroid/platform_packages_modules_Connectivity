@@ -345,7 +345,12 @@ public class BpfNetMaps {
     @VisibleForTesting
     public BpfNetMaps(final Context context, final INetd netd, final Dependencies deps) {
         if (!PRE_T) {
-            ensureInitialized(context);
+            try {
+                ensureInitialized(context);
+            } catch(Throwable t) {
+                android.util.Log.e("PHH", "Failed initialization BpfMaps, doing without it", t);
+                sEnableJavaBpfMap = false;
+            }
         }
         mNetd = netd;
         mDeps = deps;
