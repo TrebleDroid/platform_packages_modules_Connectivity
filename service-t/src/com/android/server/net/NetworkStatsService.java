@@ -412,12 +412,12 @@ public class NetworkStatsService extends INetworkStatsService.Stub {
      * mActiveUidCounterSet to avoid accessing kernel too frequently.
      */
     private SparseIntArray mActiveUidCounterSet = new SparseIntArray();
-    private final IBpfMap<S32, U8> mUidCounterSetMap;
-    private final IBpfMap<CookieTagMapKey, CookieTagMapValue> mCookieTagMap;
-    private final IBpfMap<StatsMapKey, StatsMapValue> mStatsMapA;
-    private final IBpfMap<StatsMapKey, StatsMapValue> mStatsMapB;
-    private final IBpfMap<UidStatsMapKey, StatsMapValue> mAppUidStatsMap;
-    private final IBpfMap<S32, StatsMapValue> mIfaceStatsMap;
+    private IBpfMap<S32, U8> mUidCounterSetMap = null;
+    private IBpfMap<CookieTagMapKey, CookieTagMapValue> mCookieTagMap = null;
+    private IBpfMap<StatsMapKey, StatsMapValue> mStatsMapA = null;
+    private IBpfMap<StatsMapKey, StatsMapValue> mStatsMapB = null;
+    private IBpfMap<UidStatsMapKey, StatsMapValue> mAppUidStatsMap = null;
+    private IBpfMap<S32, StatsMapValue> mIfaceStatsMap = null;
 
     /** Data layer operation counters for splicing into other structures. */
     private NetworkStats mUidOperations = new NetworkStats(0L, 10);
@@ -603,12 +603,17 @@ public class NetworkStatsService extends INetworkStatsService.Stub {
         mLocationPermissionChecker = mDeps.makeLocationPermissionChecker(mContext);
         mInterfaceMapUpdater = mDeps.makeBpfInterfaceMapUpdater(mContext, mHandler);
         mInterfaceMapUpdater.start();
-        mUidCounterSetMap = mDeps.getUidCounterSetMap();
-        mCookieTagMap = mDeps.getCookieTagMap();
-        mStatsMapA = mDeps.getStatsMapA();
-        mStatsMapB = mDeps.getStatsMapB();
-        mAppUidStatsMap = mDeps.getAppUidStatsMap();
-        mIfaceStatsMap = mDeps.getIfaceStatsMap();
+
+        try {
+            mUidCounterSetMap = mDeps.getUidCounterSetMap();
+            mCookieTagMap = mDeps.getCookieTagMap();
+            mStatsMapA = mDeps.getStatsMapA();
+            mStatsMapB = mDeps.getStatsMapB();
+            mAppUidStatsMap = mDeps.getAppUidStatsMap();
+            mIfaceStatsMap = mDeps.getIfaceStatsMap();
+        } catch(Throwable t) {
+            android.util.Log.e("PHH", "Failed creating bpf maps", t);
+        }
 
         // TODO: Remove bpfNetMaps creation and always start SkDestroyListener
         // Following code is for the experiment to verify the SkDestroyListener refactoring. Based
