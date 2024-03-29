@@ -358,7 +358,11 @@ public class BpfNetMaps {
     @VisibleForTesting
     public BpfNetMaps(final Context context, final INetd netd, final Dependencies deps) {
         if (!PRE_T) {
-            ensureInitialized(context);
+            try {
+                ensureInitialized(context);
+            } catch(Throwable t) {
+                android.util.Log.e("PHH", "Failed initialization BpfMaps, doing without it", t);
+            }
         }
         mNetd = netd;
         mDeps = deps;
@@ -932,7 +936,9 @@ public class BpfNetMaps {
         // deletion. netd and skDestroyListener could delete CookieTagMap entry concurrently.
         // So using Set to count the number of entry in the map.
         Set<K> keySet = new ArraySet<>();
-        map.forEach((k, v) -> keySet.add(k));
+        if (map != null) {
+            map.forEach((k, v) -> keySet.add(k));
+        }
         return keySet.size();
     }
 

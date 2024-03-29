@@ -75,16 +75,6 @@ static Status initPrograms(const char* cg2_path) {
     // This code was mainlined in T, so this should be trivially satisfied.
     if (!modules::sdklevel::IsAtLeastT()) return Status("S- platform is unsupported");
 
-    // S requires eBPF support which was only added in 4.9, so this should be satisfied.
-    if (!bpf::isAtLeastKernelVersion(4, 9, 0)) {
-        return Status("kernel version < 4.9.0 is unsupported");
-    }
-
-    // U bumps the kernel requirement up to 4.14
-    if (modules::sdklevel::IsAtLeastU() && !bpf::isAtLeastKernelVersion(4, 14, 0)) {
-        return Status("U+ platform with kernel version < 4.14.0 is unsupported");
-    }
-
     if (modules::sdklevel::IsAtLeastV()) {
         // V bumps the kernel requirement up to 4.19
         // see also: //system/netd/tests/kernel_test.cpp TestKernel419
@@ -125,8 +115,14 @@ static Status initPrograms(const char* cg2_path) {
     RETURN_IF_NOT_OK(checkProgramAccessible(XT_BPF_DENYLIST_PROG_PATH));
     RETURN_IF_NOT_OK(checkProgramAccessible(XT_BPF_EGRESS_PROG_PATH));
     RETURN_IF_NOT_OK(checkProgramAccessible(XT_BPF_INGRESS_PROG_PATH));
-    RETURN_IF_NOT_OK(attachProgramToCgroup(BPF_EGRESS_PROG_PATH, cg_fd, BPF_CGROUP_INET_EGRESS));
-    RETURN_IF_NOT_OK(attachProgramToCgroup(BPF_INGRESS_PROG_PATH, cg_fd, BPF_CGROUP_INET_INGRESS));
+    auto ret = attachProgramToCgroup(BPF_EGRESS_PROG_PATH, cg_fd, BPF_CGROUP_INET_EGRESS);
+    if (!isOk(ret)) {
+        ALOGE("Failed loading egress program");
+    }
+    auto ret2 = attachProgramToCgroup(BPF_INGRESS_PROG_PATH, cg_fd, BPF_CGROUP_INET_INGRESS);
+    if (!isOk(ret)) {
+        ALOGE("Failed loading ingress program");
+    }
 
     // For the devices that support cgroup socket filter, the socket filter
     // should be loaded successfully by bpfloader. So we attach the filter to
