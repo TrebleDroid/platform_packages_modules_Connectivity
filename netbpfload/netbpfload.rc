@@ -81,6 +81,6 @@ service bpfloader /system/bin/netbpfload
     #    'cannot prove return value is 0 or 1' or 'unsupported / unknown operation / helper',
     #    'invalid bpf_context access', etc.
     #
-    reboot_on_failure reboot,bpfloader-failed
+    # reboot_on_failure reboot,bpfloader-failed
     # we're not really updatable, but want to be able to load bpf programs shipped in apexes
     updatable
