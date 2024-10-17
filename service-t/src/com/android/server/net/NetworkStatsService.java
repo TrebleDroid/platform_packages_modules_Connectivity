@@ -3313,7 +3313,8 @@ public class NetworkStatsService extends INetworkStatsService.Stub {
         try {
             return mStatsFactory.readNetworkStatsDetail(uid, ifaces, tag);
         } catch (IOException e) {
-            throw new IllegalStateException(e);
+            android.util.Log.e("NetworkStatsService", "Failed grabbing network stats");
+            return new NetworkStats(1, 0);
         }
     }
 
