@@ -271,15 +271,14 @@ public class BpfNetMapsUtils {
             return BLOCKED_REASON_NONE;
         }
 
-        final long uidRuleConfig;
-        final long uidMatch;
+        long uidRuleConfig = 0;
+        long uidMatch = 0;
         try {
             uidRuleConfig = configurationMap.getValue(UID_RULES_CONFIGURATION_KEY).val;
             final UidOwnerValue value = uidOwnerMap.getValue(new Struct.S32(uid));
             uidMatch = (value != null) ? value.rule : 0L;
-        } catch (ErrnoException e) {
-            throw new ServiceSpecificException(e.errno,
-                    "Unable to get firewall chain status: " + Os.strerror(e.errno));
+        } catch (Throwable e) {
+            android.util.Log.e("BpfNetMapsUtils", "Unable to get firewall chain status");
         }
         final long blockingMatches = (uidRuleConfig & ~uidMatch & sMaskDropIfUnset)
                 | (uidRuleConfig & uidMatch & sMaskDropIfSet);
