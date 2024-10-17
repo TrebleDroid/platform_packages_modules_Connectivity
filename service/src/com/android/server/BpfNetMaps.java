@@ -838,6 +838,7 @@ public class BpfNetMaps {
     @RequiresApi(Build.VERSION_CODES.TIRAMISU)
     public int getNetPermForUid(final int uid) {
         final int appId = UserHandle.getAppId(uid);
+        if (sUidPermissionMap == null) return PERMISSION_INTERNET;
         try {
             // Key of uid permission map is appId
             // TODO: Rename map name
